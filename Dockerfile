@@ -1,2 +1,2 @@
 FROM ruby:2.3.0-onbuild
-CMD ["./maint-uploader.rb"]
+CMD ["./insanity-uploader.rb -b -m"]
