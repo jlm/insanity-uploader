@@ -30,7 +30,7 @@ Without any options, the script just logs in to the maintenance database and exi
   With the `--filepath` option, the script will parse each line of the `Projects` tab and create a new project in the
   database for each project.  Dated items are converted into events and entered into the list of events for the
   new project.  The `Editor` column is currently not proecessed.
-* `--people` (abbreviated `-t`): when given with the `--filepath` option, this causes the list of people in the `People`
+* `--people` (abbreviated `-p`): when given with the `--filepath` option, this causes the list of people in the `People`
   tab to be converted to entries in the database.  The columns in order are Role, First name, Last name, Email and
   Affiliation.  A unique record consists of a combination of Role, First name and Last name.  That is, a single
   individual can have multiple entries, one for each role they fulfil, such as Editor, Chair or ViceChair.  People must
