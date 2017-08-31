@@ -28,6 +28,12 @@ require 'slop'
 require 'yaml'
 
 
+class String
+  def casecmp?(other)
+    self.casecmp(other).zero?
+  end
+end
+
 ####
 # Log in to the Maintenance Database API
 ####
@@ -68,7 +74,15 @@ def find_project_in_tg(api, tg, designation)
   end
   projects = JSON.parse(search_result.body)
   return nil if projects.empty?
-  thisid = projects[0]['id']
+  thisid = nil
+  projects.each do |project|
+    thisdesig = project['designation']
+    revdesig = designation + '-REV'
+    if designation == thisdesig || revdesig.casecmp?(thisdesig)
+      thisid = project['id']
+    end
+  end
+  return nil unless thisid
   JSON.parse(api["projects/#{thisid}"].get accept: :json)
 end
 
@@ -301,12 +315,6 @@ def add_new_item(api, cookie, number, subject, newreq)
     reqres = add_request_to_item(api, cookie, item, newreq)
   end
   item
-end
-
-class String
-  def casecmp?(other)
-    self.casecmp(other).zero?
-  end
 end
 
 ####
@@ -566,6 +574,7 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
   page = agent.submit(f, f.buttons.first)
   puts page.pretty_print_inspect if $DEBUG
   nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
+  $logger.info("Updating projects from Development Server")
   until nextlink.nil?
     $logger.debug("New page with nextlink #{nextlink}")
     searchresult = agent.get(nextlink)
@@ -618,6 +627,8 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
       if proj.nil?
         $logger.warn("Expected project #{desig} (from devserv) not found in database")
         next
+      else
+        $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
       end
       add_events_to_project(api, cookie, proj, events) unless events.empty?
       update_project(api, cookie, proj, { title: fulltitle, par_url: par_url }) unless fulltitle.empty? and
@@ -718,6 +729,7 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
   num_unparseable_announcements = 0
   num_events_added = 0
 
+  $logger.info("Updating projects from Mail Archive")
   catch :done do
     while em_arch_url do
       page = open(em_arch_url, http_basic_authentication: mtarch_creds) { |f| f.read }
