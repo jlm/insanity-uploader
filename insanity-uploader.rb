@@ -78,7 +78,7 @@ def find_project_in_tg(api, tg, designation)
   projects.each do |project|
     thisdesig = project['designation']
     revdesig = designation + '-REV'
-    if designation == thisdesig || revdesig.casecmp?(thisdesig)
+    if designation.casecmp?(thisdesig) || revdesig.casecmp?(thisdesig)
       thisid = project['id']
     end
   end
