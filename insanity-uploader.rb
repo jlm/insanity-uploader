@@ -572,13 +572,15 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
   f.x2 = pw
   f.f0 = '3' # myproject
   page = agent.submit(f, f.buttons.first)
-  puts page.pretty_print_inspect if $DEBUG
+  #puts page.pretty_print_inspect if $DEBUG
   nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
   $logger.info("Updating projects from Development Server")
+  # Process each page of the list of active projects
   until nextlink.nil?
     $logger.debug("New page with nextlink #{nextlink}")
     searchresult = agent.get(nextlink)
     # puts searchresult.pretty_print_inspect
+    # Examine each data row representing an active project.  Extract dates to create events in the project timeline.
     searchresult.parser.css('tr.b_data_row').each do |row|
       tds = row.css('td')
       desig = tds[1].children.first.children.to_s
@@ -630,11 +632,13 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
       else
         $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
       end
+      # Overwrite existing project information and add new events to the project.
       add_events_to_project(api, cookie, proj, events) unless events.empty?
       update_project(api, cookie, proj, { title: fulltitle, par_url: par_url }) unless fulltitle.empty? and
           par_url.empty?
       twit = 34
     end
+    # Find the link to the next page of projects.
     pager = searchresult.parser.css('div.pager').children
     nextstr = pager[-1].children[-1].children.to_s
     nextlink = nextstr.empty? ? nil : pager.css('a')[-1].attributes['href'].to_s
