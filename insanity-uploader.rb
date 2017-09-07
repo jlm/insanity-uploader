@@ -566,6 +566,8 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
     agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
   end
 
+  $logger.info("Updating projects from Development Server")
+  # Assume that we are not logged in, and log in to the Development server
   page = agent.get('http://' + dev_host)
   f = page.forms.first
   f.x1 = user
@@ -573,8 +575,9 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
   f.f0 = '3' # myproject
   page = agent.submit(f, f.buttons.first)
   #puts page.pretty_print_inspect if $DEBUG
+
+  # Find the "Active PARs" page.
   nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
-  $logger.info("Updating projects from Development Server")
   # Process each page of the list of active projects
   until nextlink.nil?
     $logger.debug("New page with nextlink #{nextlink}")
