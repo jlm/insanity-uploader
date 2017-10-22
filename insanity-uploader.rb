@@ -552,6 +552,48 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
 end
 
 ####
+# Follow the PAR detail link to get the PAR's dates, full title, etc.
+####
+# @param [Mechanize] agent
+# @param [uri] link
+def parse_par_page(agent, link)
+  events = []
+  fulltitle = ''
+  projpage = agent.get(link)
+  box = projpage.css('div.tab-content-box')
+  par_path = box.css('div.task_menu').children.first.attributes['href'].to_s
+  par_url = URI.parse(link) + URI.parse(par_path)
+  (0..box.children.count-1).each do |parlineno|
+    case box.children[parlineno].to_s
+      when /PAR Request Date/
+        mydate = Date.parse(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Requested', description: 'PAR Requested: ' + mydate.to_s}
+      when /PAR Approval Date/
+        mydate = Date.parse(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Approval', description: 'PAR Approval: ' + mydate.to_s}
+      when /PAR Expiration Date/
+        mydate = Date.parse(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Expiry', description: 'PAR Expiry: ' + mydate.to_s}
+      when /2.1 Title/
+        if box.children[parlineno].css('td.b_align_nw').empty?
+          fulltitle = box.children[parlineno+1].to_s
+        else
+          fulltitle = box.children[parlineno].css('td.b_align_nw')[0].children[1].to_s
+        end
+      when /4.2.*Initial Sponsor Ballot/
+        mydate = Date.parse(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'Expected Initial Sponsor Ballot',
+                   description: 'Expected Initial Sponsor Ballot: ' + mydate.to_s}
+      when /4.3.*RevCom/
+        mydate = Date.parse(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'Expected RevCom',
+                   description: 'Expected RevCom: ' + mydate.to_s}
+    end
+  end
+  return fulltitle, par_url.to_s, events
+end
+
+####
 # Add or update projects from the Development Server.
 ####
 # @param [RestClient::Resource] api
@@ -576,8 +618,14 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
   page = agent.submit(f, f.buttons.first)
   #puts page.pretty_print_inspect if $DEBUG
 
+  $D_METHOD = :active_pars
+  # $D_METHOD = :active_pars
+  if $D_METHOD == :active_pars
+    nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
+  elsif $D_METHOD == :par_report
+    nextlink = URI::HTTP.build(host: dev_host, path: '/pub/par-report', query: 'par_report=1&committee_id=&s=802.1')
+  end
   # Find the "Active PARs" page.
-  nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
   # Process each page of the list of active projects
   until nextlink.nil?
     $logger.debug("New page with nextlink #{nextlink}")
@@ -590,42 +638,14 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
       next unless /802.1[a-zA-Z]+|802[a-zA-Z]/.match(desig)
       $logger.debug("Considering project #{desig}")
       events = []
-      fulltitle = ''
-      link = tds[1].children.first.attributes['href'].to_s
+      par_link = tds[1].children.first.attributes['href'].to_s
       par_url = tds[3].children.first.children.to_s
       par_approval = Date.parse(tds[4].children.css('noscript').children.to_s)
       events << { date: par_approval, name: 'PAR Approval', description: 'PAR Approval: ' + par_approval.to_s }
 
-      # Follow the PAR detail link to get the PAR's dates, full title, etc.
-      projpage = agent.get(link)
-      box = projpage.css('div.tab-content-box')
-      (0..box.children.count-1).each do |parlineno|
-        case box.children[parlineno].to_s
-          when /PAR Request Date/
-            mydate = Date.parse(box.children[parlineno+1].to_s)
-            events << { date: mydate, name: 'PAR Requested', description: 'PAR Requested: ' + mydate.to_s }
-          when /PAR Approval Date/
-            mydate = Date.parse(box.children[parlineno+1].to_s)
-            events << { date: mydate, name: 'PAR Approval', description: 'PAR Approval: ' + mydate.to_s }
-          when /PAR Expiration Date/
-            mydate = Date.parse(box.children[parlineno+1].to_s)
-            events << { date: mydate, name: 'PAR Expiry', description: 'PAR Expiry: ' + mydate.to_s }
-          when /2.1 Title/
-            if box.children[parlineno].css('td.b_align_nw').empty?
-              fulltitle = box.children[parlineno+1].to_s
-            else
-              fulltitle = box.children[parlineno].css('td.b_align_nw')[0].children[1].to_s
-            end
-          when /4.2.*Initial Sponsor Ballot/
-            mydate = Date.parse(box.children[parlineno+1].to_s)
-            events << { date: mydate, name: 'Expected Initial Sponsor Ballot',
-                        description: 'Expected Initial Sponsor Ballot: ' + mydate.to_s }
-          when /4.3.*RevCom/
-            mydate = Date.parse(box.children[parlineno+1].to_s)
-            events << { date: mydate, name: 'Expected RevCom',
-                        description: 'Expected RevCom: ' + mydate.to_s }
-        end
-      end
+      fulltitle,ign,e = parse_par_page(agent, par_link)
+      events += e
+
       # Look up the project in the database without using a task group
       desig[/^P*/] = '' # Remove leading P
       proj = find_project_in_tg(api, nil, desig)
