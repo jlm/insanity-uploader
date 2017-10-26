@@ -52,7 +52,7 @@ def login(api, username, password)
 end
 
 ####
-# Search the Maintenance Database for an item with the specified number and return the parsed item
+# Search the Database for a task group with the specified name and return the parsed item
 ####
 def find_task_group(api, name)
   search_result = api['task_groups'].get accept: :json, params: {search: name}
@@ -60,6 +60,16 @@ def find_task_group(api, name)
   return nil if tgs.empty?
   thisid = tgs[0]['id']
   JSON.parse(api["task_groups/#{thisid}"].get accept: :json)
+end
+
+####
+# Fetch the list of task groups from the database and return the parsed list
+####
+def find_task_groups(api)
+  search_result = api['task_groups'].get accept: :json
+  tgs = JSON.parse(search_result.body)
+  return nil if tgs.empty?
+  tgs
 end
 
 ####
@@ -417,6 +427,19 @@ def update_task_group(api, cookie, tgtoupdate, person)
 end
 
 ####
+# Safely parse a date which might not be present
+####
+# @param [string] maybedate
+def safe_date(maybedate)
+  begin
+    parsed_date = Date.parse(maybedate)
+  rescue ArgumentError
+    return nil
+  end
+  parsed_date
+end
+
+####
 # Add or update projects from the Insanity Spreadsheet.  Optionally update the People and Task Groups
 ####
 # @param [RestClient::Resource] api
@@ -566,14 +589,14 @@ def parse_par_page(agent, link)
   (0..box.children.count-1).each do |parlineno|
     case box.children[parlineno].to_s
       when /PAR Request Date/
-        mydate = Date.parse(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Requested', description: 'PAR Requested: ' + mydate.to_s}
+        mydate = safe_date(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Requested', description: 'PAR Requested: ' + mydate.to_s} if mydate
       when /PAR Approval Date/
-        mydate = Date.parse(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Approval', description: 'PAR Approval: ' + mydate.to_s}
+        mydate = safe_date(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Approval', description: 'PAR Approval: ' + mydate.to_s} if mydate
       when /PAR Expiration Date/
-        mydate = Date.parse(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Expiry', description: 'PAR Expiry: ' + mydate.to_s}
+        mydate = safe_date(box.children[parlineno+1].to_s)
+        events << {date: mydate, name: 'PAR Expiry', description: 'PAR Expiry: ' + mydate.to_s} if mydate
       when /2.1 Title/
         if box.children[parlineno].css('td.b_align_nw').empty?
           fulltitle = box.children[parlineno+1].to_s
@@ -581,20 +604,20 @@ def parse_par_page(agent, link)
           fulltitle = box.children[parlineno].css('td.b_align_nw')[0].children[1].to_s
         end
       when /4.2.*Initial Sponsor Ballot/
-        mydate = Date.parse(box.children[parlineno+1].to_s)
+        mydate = safe_date(box.children[parlineno+1].to_s)
         events << {date: mydate, name: 'Expected Initial Sponsor Ballot',
-                   description: 'Expected Initial Sponsor Ballot: ' + mydate.to_s}
+                   description: 'Expected Initial Sponsor Ballot: ' + mydate.to_s} if mydate
       when /4.3.*RevCom/
-        mydate = Date.parse(box.children[parlineno+1].to_s)
+        mydate = safe_date(box.children[parlineno+1].to_s)
         events << {date: mydate, name: 'Expected RevCom',
-                   description: 'Expected RevCom: ' + mydate.to_s}
+                   description: 'Expected RevCom: ' + mydate.to_s} if mydate
     end
   end
   return fulltitle, par_url.to_s, events
 end
 
 ####
-# Add or update projects from the Development Server.
+# Add or update projects from the Development Server's Active PARs page.
 ####
 # @param [RestClient::Resource] api
 # @param [cookie] cookie
@@ -617,14 +640,7 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
   f.f0 = '3' # myproject
   page = agent.submit(f, f.buttons.first)
   #puts page.pretty_print_inspect if $DEBUG
-
-  $D_METHOD = :active_pars
-  # $D_METHOD = :active_pars
-  if $D_METHOD == :active_pars
-    nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
-  elsif $D_METHOD == :par_report
-    nextlink = URI::HTTP.build(host: dev_host, path: '/pub/par-report', query: 'par_report=1&committee_id=&s=802.1')
-  end
+  nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
   # Find the "Active PARs" page.
   # Process each page of the list of active projects
   until nextlink.nil?
@@ -640,8 +656,8 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
       events = []
       par_link = tds[1].children.first.attributes['href'].to_s
       par_url = tds[3].children.first.children.to_s
-      par_approval = Date.parse(tds[4].children.css('noscript').children.to_s)
-      events << { date: par_approval, name: 'PAR Approval', description: 'PAR Approval: ' + par_approval.to_s }
+      par_approval = safe_date(tds[4].children.css('noscript').children.to_s)
+      events << { date: par_approval, name: 'PAR Approval', description: 'PAR Approval: ' + par_approval.to_s } if par_approval
 
       fulltitle,ign,e = parse_par_page(agent, par_link)
       events += e
@@ -652,6 +668,123 @@ def update_projects_from_dev_server(api, cookie, dev_host, user, pw)
       if proj.nil?
         $logger.warn("Expected project #{desig} (from devserv) not found in database")
         next
+      else
+        $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
+      end
+      # Overwrite existing project information and add new events to the project.
+      add_events_to_project(api, cookie, proj, events) unless events.empty?
+      update_project(api, cookie, proj, { title: fulltitle, par_url: par_url }) unless fulltitle.empty? and
+          par_url.empty?
+      twit = 34
+    end
+    # Find the link to the next page of projects.
+    pager = searchresult.parser.css('div.pager').children
+    nextstr = pager[-1].children[-1].children.to_s
+    nextlink = nextstr.empty? ? nil : pager.css('a')[-1].attributes['href'].to_s
+  end
+
+end
+
+####
+# Add or update projects from the Development Server's PAR report page.
+# It wouldn't be a good idea to just add them all: There are multiple projects with the same designation.
+# This is because revision projects don't have unique names.  Therefore, we use a list of names
+# read from a file.
+####
+# @param [RestClient::Resource] api
+# @param [cookie] cookie
+# @param [string] dev_host
+# @param [string] user
+# @param [string] pw
+# @param [Hash] projects
+# @param [Array] task_groups
+def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, task_groups)
+  agent = Mechanize.new
+  if $DEBUG
+    agent.set_proxy('localhost', 8888)
+    agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  end
+
+  $logger.info("Updating projects from PAR report on development server")
+  # Assume that we are not logged in, and log in to the Development server
+  page = agent.get('http://' + dev_host)
+  f = page.forms.first
+  f.x1 = user
+  f.x2 = pw
+  f.f0 = '3' # myproject
+  page = agent.submit(f, f.buttons.first)
+  #puts page.pretty_print_inspect if $DEBUG
+
+  nextlink = URI::HTTP.build(host: dev_host, path: '/pub/par-report', query: 'par_report=1&committee_id=&s=802.1')
+
+  # Find the "PAR Report" page.
+  # Process each page of the list of active projects
+  until nextlink.nil?
+    $logger.debug("New PAR report page with nextlink #{nextlink}")
+    searchresult = agent.get(nextlink)
+    # puts searchresult.pretty_print_inspect
+    # Examine each data row representing a project.  Extract dates to create events in the project timeline.
+    searchresult.parser.css('tr.b_data_row').each do |row|
+      tds = row.css('td')
+      desig = tds[0].children.first.children.to_s
+      next unless /802.1[a-zA-Z]+|802[a-zA-Z]/.match(desig)
+      $logger.debug("Considering project #{desig}")
+      events = []
+      par_link = tds[0].children.first.attributes['href'].to_s
+
+      par_approval = safe_date(tds[6].children.to_s)
+      events << { date: par_approval, name: 'PAR Approval', description: 'PAR Approval: ' + par_approval.to_s } if par_approval
+
+      par_expiry = safe_date(tds[7].children.to_s)
+      events << { date: par_expiry, name: 'PAR Expiry', description: 'PAR Expiry: ' + par_expiry.to_s } if par_expiry
+
+      status = tds[10].children.to_s
+
+      fulltitle,par_url,e = parse_par_page(agent, par_link)
+      events += e
+
+      # Look up the project in the database without using a task group
+      desig[/^P*/] = '' # Remove leading P
+      unless projects.keys.include? desig
+        $logger.info("Not adding project #{desig} (from PAR Report) as it's not in the approved list")
+        next
+      end
+
+      proj = find_project_in_tg(api, nil, desig)
+      if proj.nil?
+        $logger.warn("Expected project #{desig} (from PAR report) not found in database: adding it")
+        # Find the task group in the task_groups list from the projects[desig] entry
+        tg = task_groups.detect { |t| t['abbrev'] == projects[desig]}
+        unless tg
+          $logger.error("Task group #{projects[desig]} from approved list not found")
+          next
+        end
+        # Add the project to the task group.
+        case status
+          when 'Complete'
+            status = 'Approved'
+          when 'WG Draft Development'
+            status = 'ParApproved'
+          when 'Sponsor Ballot: Invitation'
+            status = 'WgBallotRecirc'     # This is a bit of a kludge
+          when /Sponsor Ballot/
+            status = 'SponsorBallot'
+          when /Com Agenda (\d\d-\w+-\d\d\d\d)/
+            agd = safe_date(status)
+            status = status.split[0]            # Just keep the first word: NesCom or RevCom
+            events << { date: agd, name: status, description: "#{status}: " + agd.to_s } if agd
+        end
+        ptype, base = parse_desig(desig)
+        newproj = {
+            designation: desig,
+            project_type: ptype,
+            base: base,
+            short_title: 'unset',
+            title: 'unset',
+            status: status,
+            next_action: 'EditorsDraft'     # This is a kludge
+        }
+        proj = add_project_to_tg(api, cookie, tg, newproj)
       else
         $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
       end
@@ -848,6 +981,7 @@ begin
     o.bool   '-t', '--task-groups', 'Update the Task Groups from the Insanity spreadsheet'
     o.string '-f', '--filepath', 'path to an Excel XLSX-format Insanity spreadsheet'
     o.bool   '-b', '--devserv', 'update from development server'
+    o.string '-r', '--par-report', 'add projects listed in file name from Devserv\'s PAR report'
     o.bool   '-m', '--mailserv', 'update from mailing list'
     o.bool   '-p', '--people', 'create or update people from the Insanity spreadsheet\'s People tab'
   end
@@ -874,6 +1008,12 @@ begin
 
   parse_insanity_spreadsheet(maint, maint_cookie, opts[:filepath], opts) if opts[:filepath]
 
+  task_groups = find_task_groups(maint)
+
+  if opts[:par_report]
+    update_projects_from_par_report( maint, maint_cookie, config['dev_host'], config['dev_user'],
+                                     config['dev_pw'], YAML.load(File.read(opts[:par_report])), task_groups)
+  end
   if opts.devserv?
     update_projects_from_dev_server(maint, maint_cookie, config['dev_host'], config['dev_user'],
                                     config['dev_pw'])
