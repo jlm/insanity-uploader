@@ -43,6 +43,12 @@ Without any options, the script just logs in to the maintenance database and exi
 * `--devserv` (abbreviated `-b`): log in to the IEEE myProject system and scan the list of active PARs with designations
   starting '802[a-zA-Z]' and '802.1[a-zA-Z]'.  Each project is added to or updated in the database.  The original PAR URL
   and full title are recorded.  The current PAR is examined and the PAR dates are entered as project events. 
+* `--par-report` (abbreviated `-r`): Parse the PAR Report from MyProject. The --par-report option takes a filename
+  argument. The file is a set of lines representing the projects to look for in the PAR Report.  Each line has the
+  project designation, a colon, a space, and then the abbreviated Task Group name to which to assign the project.
+  The task group has to exist. The entire PAR Report is parsed.  When a project is found which matches an entry in the
+  list described above, The project is added (or updated) in the database using information from the PAR Report entry
+  and from the linked HTML-format PAR.
 * `--mailserv` (abbreviated `-m`): Log in to the 802.1 email archive and scan it for messages announcing task group and
   working group ballots.  The ballot dates are recorded in the project event list.
 * `--secrets secretfile.yml` (abbreviated `-s`): Use the given file for the configuration options rather than the
