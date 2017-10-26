@@ -587,16 +587,43 @@ def parse_par_page(agent, link)
   par_path = box.css('div.task_menu').children.first.attributes['href'].to_s
   par_url = URI.parse(link) + URI.parse(par_path)
   (0..box.children.count-1).each do |parlineno|
+    ptype = ''
     case box.children[parlineno].to_s
+      when /Type of Project/
+        case box.children[parlineno+1].to_s
+          when /Modify Existing/
+            ptype = 'Modification'
+          when /Revision to/
+            ptype = 'Revision'
+          when /Amendment to/
+            ptype = 'Amendment'
+          when /New IEEE/
+            ptype = 'New'
+        end
       when /PAR Request Date/
         mydate = safe_date(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Requested', description: 'PAR Requested: ' + mydate.to_s} if mydate
+        if mydate
+          name = if ptype == 'Modification'
+                   'PAR Modification Requested'
+                 else
+                   'PAR Requested'
+                 end
+          events << {date: mydate, name: name, description: "#{name}: " + mydate.to_s}
+        end
       when /PAR Approval Date/
         mydate = safe_date(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Approval', description: 'PAR Approval: ' + mydate.to_s} if mydate
+        if mydate
+          name = if ptype == 'Modification'
+                   'PAR Modification Approval'
+                 else
+                   'PAR Approval'
+                 end
+          events << {date: mydate, name: name, description: "#{name}: " + mydate.to_s}
+        end
       when /PAR Expiration Date/
         mydate = safe_date(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'PAR Expiry', description: 'PAR Expiry: ' + mydate.to_s} if mydate
+        name = 'PAR Expiry'
+        events << {date: mydate, name: name, description: "#{name}: " + mydate.to_s} if mydate
       when /2.1 Title/
         if box.children[parlineno].css('td.b_align_nw').empty?
           fulltitle = box.children[parlineno+1].to_s
@@ -605,12 +632,12 @@ def parse_par_page(agent, link)
         end
       when /4.2.*Initial Sponsor Ballot/
         mydate = safe_date(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'Expected Initial Sponsor Ballot',
-                   description: 'Expected Initial Sponsor Ballot: ' + mydate.to_s} if mydate
+        name = 'Expected Initial Sponsor Ballot'
+        events << {date: mydate, name: name, description: "#{name}: " + mydate.to_s} if mydate
       when /4.3.*RevCom/
         mydate = safe_date(box.children[parlineno+1].to_s)
-        events << {date: mydate, name: 'Expected RevCom',
-                   description: 'Expected RevCom: ' + mydate.to_s} if mydate
+        name = 'Expected RevCom'
+        events << {date: mydate, name: name, description: "#{name}: " + mydate.to_s} if mydate
     end
   end
   return fulltitle, par_url.to_s, events
