@@ -755,7 +755,8 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
       tds = row.css('td')
       desig = tds[0].children.first.children.to_s
       next unless /802.1[a-zA-Z]+|802[a-zA-Z]/.match(desig)
-      $logger.debug("Considering project #{desig}")
+      partype = tds[1].children.to_s
+      $logger.debug("Considering project #{desig} (#{partype})")
       events = []
       par_link = tds[0].children.first.attributes['href'].to_s
 
@@ -773,7 +774,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
       # Look up the project in the database without using a task group
       desig[/^P*/] = '' # Remove leading P
       unless projects.keys.include? desig
-        $logger.info("Not adding project #{desig} (from PAR Report) as it's not in the approved list")
+        $logger.info("Not adding project #{desig} (#{partype}) (from PAR Report) as it's not in the approved list")
         next
       end
 
