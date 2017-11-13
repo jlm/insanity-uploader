@@ -66,7 +66,7 @@ Deployment
 The script can be deployed in a Docker container.  I use a very simple one based on Ruby:2.3.0-onbuild.
 This method is frowned upon. Bear in mind that the `secrets.yml` file will be included into the
 container, so the container is secret too.  There are methods to isolate the secret information
-from the container, but I have not bothered to do this.
+from the container, but I have not bothered to do this.  Therefore, deployment to the Docker server is done from the development machine using `docker save` and `docker load`.
 
 License
 -------
