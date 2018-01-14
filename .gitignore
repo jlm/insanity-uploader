@@ -21,6 +21,8 @@ secrets.sh
 docker-tutum-stack*.yml
 docker-cloud-stack*.yml
 secrets.yml
+secrets-localhost.yml
+secrets-prodhost.yml
 # Ignore linked files for rails (JLM 150513)
 config/database.yml
 config/secrets.yml
