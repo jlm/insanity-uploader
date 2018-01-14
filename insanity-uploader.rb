@@ -1062,9 +1062,10 @@ end
 # @param [string] user
 # @param [string] pw
 # @param [Array] blacklist
-# # @param [Array<String>] onlydesigs
+# @param [Array<String>] onlydesigs
+# @param [Integer] limit
 # noinspection RubyInstanceMethodNamingConvention
-def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw, blacklist, onlydesigs)
+def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw, blacklist, onlydesigs, limit)
   #
   # Parse each index page of the 802.1 Maintenance Reflector Archive
   # and find the maintenance items
@@ -1077,6 +1078,8 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
   num_ballots = 0
   num_unparseable_announcements = 0
   num_events_added = 0
+
+  pagecount = 0
 
   $logger.info("Updating projects from Mail Archive")
   catch :done do
@@ -1151,6 +1154,8 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
       end
       nextpage = pagedoc.search('tr')[1].children.search('td').children[4].attributes['href']
       em_arch_url = nextpage ? arch_url + '/' + nextpage.value : nil
+      pagecount += 1
+      break if pagecount == limit     # note that setting limit to 0 makes it go on for a long time
     end
   end
 
@@ -1233,6 +1238,6 @@ begin
     update_projects_from_mail_server(maint, maint_cookie, config['email_archive'],
                                      config['email_start'],
                                      config['archive_user'], config['archive_password'],
-                                     config['blacklist'], only)
+                                     config['blacklist'], only, config['email_limit'].to_i)
   end
 end
