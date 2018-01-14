@@ -29,7 +29,7 @@ GEM
       http-cookie (>= 1.0.2, < 2.0)
       mime-types (>= 1.16, < 4.0)
       netrc (~> 0.8)
-    rubyXL (3.3.26)
+    rubyXL (3.3.27)
       nokogiri (>= 1.4.4)
       rubyzip (>= 1.1.6)
     rubyzip (1.2.1)
@@ -51,4 +51,4 @@ DEPENDENCIES
   slop
 
 BUNDLED WITH
-   1.16.0
+   1.16.1
