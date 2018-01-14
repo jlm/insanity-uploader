@@ -4,4 +4,4 @@ COPY Gemfile* ./
 RUN bundle install
 COPY . .
 
-CMD ["./insanity-uploader.rb","--config","secrets-prodhost.yml","--par-report","pars-to-add.yml","-m","--sb"]
+CMD ["./insanity-uploader.rb","--config","secrets-prodhost.yml","--par-report","http://ieee802.org/1/files/public/insanity/pars-to-add.yml","-m","--sb"]

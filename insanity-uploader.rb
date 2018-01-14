@@ -26,6 +26,7 @@ require 'rest-client'
 require 'rubyXL'
 require 'slop'
 require 'yaml'
+require 'open-uri'
 
 class String
   def casecmp?(other)
@@ -1222,7 +1223,7 @@ begin
 
   if opts[:par_report]
     update_projects_from_par_report(maint, maint_cookie, config['dev_host'], config['dev_user'],
-                                    config['dev_pw'], YAML.load(File.read(opts[:par_report])), task_groups)
+                                    config['dev_pw'], YAML.load(open(opts[:par_report]).read), task_groups)
   end
   if opts.active?
      update_projects_from_active_pars(maint, maint_cookie, config['dev_host'], config['dev_user'],
