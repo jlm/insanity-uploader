@@ -40,10 +40,14 @@ Without any options, the script just logs in to the maintenance database and exi
   in the database before projects can be assigned to them.
 * `--delete-existing` (abbreviated `-d`): delete an existing project before creating its replacement.
 * `--update` (abbreviated `-u`): update existing projects with information from the Insanity spreadsheet.
-* `--devserv` (abbreviated `-b`): log in to the IEEE myProject system and scan the list of active PARs with designations
+* `--active` (abbreviated `-a`): log in to the IEEE myProject system and scan the list of active PARs with designations
   starting '802[a-zA-Z]' and '802.1[a-zA-Z]'.  Each project is added to or updated in the database.  The original PAR URL
   and full title are recorded.  The current PAR is examined and the PAR dates are entered as project events. 
-* `--par-report` (abbreviated `-r`): Parse the PAR Report from MyProject. The --par-report option takes a filename
+* `--sb` (abbreviated `-s`): log in to the IEEE myProject system and scan the list of notifications for sponsor
+  ballot announcements.  Only PARs with designations starting '802[a-zA-Z]' and '802.1[a-zA-Z]' are considered.
+  The Sponsor Ballots are entered as project events, including the opening and closing dates.  Unfortunately the
+  announcements don't give any further detail such as draft numbers or recirculation numbers.
+* `--par-report parfile.yml` (abbreviated `-r`): Parse the PAR Report from MyProject. The `--par-report` option takes a filename
   argument. The file is a set of lines representing the projects to look for in the PAR Report.  Each line has the
   project designation, a colon, a space, and then the abbreviated Task Group name to which to assign the project.
   The task group has to exist. The entire PAR Report is parsed.  When a project is found which matches an entry in the
@@ -51,7 +55,11 @@ Without any options, the script just logs in to the maintenance database and exi
   and from the linked HTML-format PAR.
 * `--mailserv` (abbreviated `-m`): Log in to the 802.1 email archive and scan it for messages announcing task group and
   working group ballots.  The ballot dates are recorded in the project event list.
-* `--secrets secretfile.yml` (abbreviated `-s`): Use the given file for the configuration options rather than the
+* `--only par-list` (abbreviated `-O`): for the `--sb` and `--mailserv` options, the PARs considered are limited to
+  those listed in the argument, which can be space- or comma-separated.
+* `--dryrun` (abbreviated `-n`): don't make any changes to the database.  This may not do what you expect, as
+  actions often depend on subactions completing successfully, and they won't.
+* `--config secretfile.yml` (abbreviated `-c`): Use the given file for the configuration options rather than the
   default `secrets.yml`. 
 
 Usage
@@ -63,14 +71,14 @@ the script is run regularly to update project information from the myProject ser
 Deployment
 ----------
 
-The script can be deployed in a Docker container.  I use a very simple one based on Ruby:2.3.0-onbuild.
-This method is frowned upon. Bear in mind that the `secrets.yml` file will be included into the
+The script can be deployed in a Docker container.  I use a very simple one based on Ruby:2.4.
+Bear in mind that the `secrets-prodhost.yml` file will be included into the
 container, so the container is secret too.  There are methods to isolate the secret information
 from the container, but I have not bothered to do this.  Therefore, deployment to the Docker server is done from the development machine using `docker save` and `docker load`.
 
 License
 -------
-Copyright 2016-2017 John Messenger
+Copyright 2016-2018 John Messenger
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
