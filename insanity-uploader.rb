@@ -106,7 +106,7 @@ def add_project_to_tg(api, cookie, tg, newproj)
   tgid = tg['id']
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
   begin
-    res = api["task_groups/#{tgid}/projects"].post newproj.to_json, option_hash
+    res = api["task_groups/#{tgid}/projects"].post newproj.to_json, option_hash unless $dryrun
     twit = 11
   rescue => e
     $logger.fatal "add_project_to_tg => exception #{e.class.name} : #{e.message}"
@@ -117,7 +117,7 @@ def add_project_to_tg(api, cookie, tg, newproj)
       exit(1)
     end
   end
-  JSON.parse(res)
+  res && JSON.parse(res)
 end
 
 ####
@@ -128,7 +128,7 @@ def update_project(api, cookie, proj, update)
   projid = proj['id']
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
   begin
-    res = api["task_groups/#{tgid}/projects/#{projid}"].patch update.to_json, option_hash
+    res = api["task_groups/#{tgid}/projects/#{projid}"].patch update.to_json, option_hash unless $dryrun
     twit = 11
   rescue => e
     $logger.fatal "update_project => exception #{e.class.name} : #{e.message}"
@@ -171,7 +171,7 @@ def add_events_to_project(api, cookie, proj, events)
       ev = find_event_in_proj(api, proj, event[:name])
       if ev.empty?
         $logger.warn("Adding event #{event[:name]} to project #{proj['designation']}")
-        res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash
+        res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
       else
         ev.each do |e|
           if e['name'] == event[:name] && e['date'].to_s == event[:date].to_s && e['end_date'].to_s == event[:end_date].to_s
@@ -181,7 +181,7 @@ def add_events_to_project(api, cookie, proj, events)
         end
         unless found
           $logger.warn("Adding extra event #{event[:name]} to project #{proj['designation']}")
-          res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash
+          res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
         end
       end
     end
@@ -316,10 +316,10 @@ def delete_project(api, cookie, tg, project)
     events = JSON.parse(events_result)
     $logger.info "Project #{project['designation']} has #{events.count} events"
     events.each do |event|
-      res = api["task_groups/#{tg['id']}/projects/#{project['id']}/events/#{event['id']}"].delete option_hash
+      res = api["task_groups/#{tg['id']}/projects/#{project['id']}/events/#{event['id']}"].delete option_hash unless $dryrun
     end
   end
-  res = api["task_groups/#{tg['id']}/projects/#{project['id']}"].delete option_hash
+  res = api["task_groups/#{tg['id']}/projects/#{project['id']}"].delete option_hash unless $dryrun
   twit = 14
 end
 
@@ -331,8 +331,8 @@ def add_new_item(api, cookie, number, subject, newreq)
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
   newitem = { number: number, clause: newreq['clauseno'], date: newreq['date'], standard: newreq['standard'],
               subject: subject }
-  res = api["items"].post newitem.to_json, option_hash
-  if res.code == 201
+  res = api["items"].post newitem.to_json, option_hash unless $dryrun
+  if res&.code == 201
     item = JSON.parse(res.body)
     reqres = add_request_to_item(api, cookie, item, newreq)
   end
@@ -371,8 +371,8 @@ end
 def add_new_person(api, cookie, person)
   pers = nil
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
-  res = api["people"].post person.to_json, option_hash
-  if res.code == 201
+  res = api["people"].post person.to_json, option_hash unless $dryrun
+  if res&.code == 201
     pers = JSON.parse(res.body)
   end
   pers
@@ -390,8 +390,8 @@ def update_person(api, cookie, perstoupdate, person)
   pers_id = perstoupdate['id']
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
   pers = nil
-  res = api["people/#{pers_id}"].patch person.to_json, option_hash
-  if res.code == 201
+  res = api["people/#{pers_id}"].patch person.to_json, option_hash unless $dryrun
+  if res&.code == 201
     pers = JSON.parse(res.body)
   end
   pers
@@ -411,8 +411,8 @@ def add_new_task_group(api, cookie, abbrev, tgname, person)
   newtg = { abbrev: abbrev, name: tgname, chair_id: pers_id }
   tg = nil
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
-  res = api["task_groups"].post newtg.to_json, option_hash
-  if res.code == 201
+  res = api["task_groups"].post newtg.to_json, option_hash unless $dryrun
+  if res&.code == 201
     tg = JSON.parse(res.body)
   end
   tg
@@ -431,8 +431,8 @@ def update_task_group(api, cookie, tgtoupdate, person)
   option_hash = { content_type: :json, accept: :json, cookies: cookie }
   tgtoupdate['chair_id'] = person['id']
   tg = nil
-  res = api["task_groups/#{tg_id}"].patch tgtoupdate.to_json, option_hash
-  if res.code == 201 # actually it seems to return 204.
+  res = api["task_groups/#{tg_id}"].patch tgtoupdate.to_json, option_hash unless $dryrun
+  if res&.code == 201 # actually it seems to return 204.
     tg = JSON.parse(res.body)
   end
   tg
@@ -968,6 +968,10 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
           next_action: 'EditorsDraft' # This is a kludge
         }
         proj = add_project_to_tg(api, cookie, tg, newproj)
+        unless proj
+          $logger.error "Addition failed."
+          raise('ProjAdditionFailed')
+        end
       else
         $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
       end
@@ -1176,16 +1180,22 @@ begin
     o.bool   '-m', '--mailserv', 'update from mailing list'
     o.bool   '-p', '--people', 'create or update people from the Insanity spreadsheet\'s People tab'
     o.string '-O', '--only', 'limit some actions to the named project designations'
+    o.bool   '-n', '--dryrun', 'do not make changes to the database: just show what would have happened'
   end
 
   config = YAML.load(File.read(opts[:config]))
   #
   # Log in to the 802.1 Maintenance Database
   #
+  $dryrun = opts.dryrun?
   $DEBUG = opts.debug?
   $logger = Logger.new(STDOUT)
   $logger.level = opts[:loglevel]
   $logger.level = Logger::DEBUG if $DEBUG
+
+  if $dryrun
+    $logger.warn "Dryrun mode: NO CHANGES to database"
+  end
 
   if $DEBUG
     RestClient.proxy = "http://localhost:8888"
