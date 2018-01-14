@@ -109,10 +109,10 @@ def add_project_to_tg(api, cookie, tg, newproj)
     res = api["task_groups/#{tgid}/projects"].post newproj.to_json, option_hash
     twit = 11
   rescue => e
-    $logger.error "add_project_to_tg => exception #{e.class.name} : #{e.message}"
+    $logger.fatal "add_project_to_tg => exception #{e.class.name} : #{e.message}"
     if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
       eje.each do |k, v|
-        $logger.error "#{k}: #{v.first}"
+        $logger.fatal "#{k}: #{v.first}"
       end
       exit(1)
     end
@@ -131,10 +131,10 @@ def update_project(api, cookie, proj, update)
     res = api["task_groups/#{tgid}/projects/#{projid}"].patch update.to_json, option_hash
     twit = 11
   rescue => e
-    $logger.error "update_project => exception #{e.class.name} : #{e.message}"
+    $logger.fatal "update_project => exception #{e.class.name} : #{e.message}"
     if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
       eje.each do |k, v|
-        $logger.error "#{k}: #{v.first}"
+        $logger.fatal "#{k}: #{v.first}"
       end
       exit(1)
     end
@@ -170,27 +170,27 @@ def add_events_to_project(api, cookie, proj, events)
       found = false
       ev = find_event_in_proj(api, proj, event[:name])
       if ev.empty?
-        $logger.info("Adding event #{event[:name]} to project #{proj['designation']}")
+        $logger.warn("Adding event #{event[:name]} to project #{proj['designation']}")
         res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash
       else
         ev.each do |e|
           if e['name'] == event[:name] && e['date'].to_s == event[:date].to_s && e['end_date'].to_s == event[:end_date].to_s
             found = true
-            $logger.debug("Found matching event #{event[:name]} for project #{proj['designation']}")
+            $logger.info("Found matching event #{event[:name]} for project #{proj['designation']}")
           end
         end
         unless found
-          $logger.info("Adding extra event #{event[:name]} to project #{proj['designation']}")
+          $logger.warn("Adding extra event #{event[:name]} to project #{proj['designation']}")
           res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash
         end
       end
     end
     twit = 11 ##########
   rescue => e
-    $logger.error "add_events_to_project => exception #{e.class.name} : #{e.message}"
+    $logger.fatal "add_events_to_project => exception #{e.class.name} : #{e.message}"
     if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
       eje.each do |k, v|
-        $logger.error "#{k}: #{v.first}"
+        $logger.fatal "#{k}: #{v.first}"
       end
       exit(1)
     end
@@ -480,14 +480,14 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
     people.each do |person|
       pers = find_person(api, person[:first_name], person[:last_name], person[:role])
       if pers.nil?
-        $logger.info("Adding new person #{person[:first_name]} #{person[:last_name]} as #{person[:role]}")
+        $logger.warn("Adding new person #{person[:first_name]} #{person[:last_name]} as #{person[:role]}")
         add_new_person(api, cookie, person)
       else
         unless (pers['email'].casecmp?(person[:email])) && (pers['affiliation'].casecmp?(person[:affiliation]))
-          $logger.info("Updating person #{person[:first_name]} #{person[:last_name]} as #{person[:role]}")
+          $logger.warn("Updating person #{person[:first_name]} #{person[:last_name]} as #{person[:role]}")
           update_person(api, cookie, pers, person)
         else
-          $logger.debug("Up-to-date person #{pers['first_name']} #{pers['last_name']} as #{pers['role']}")
+          $logger.info("Up-to-date person #{pers['first_name']} #{pers['last_name']} as #{pers['role']}")
         end
       end
     end
@@ -509,10 +509,10 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
       end
       tg = find_task_group(api, taskgroup[:name])
       if tg.nil?
-        $logger.info "Creating task group #{taskgroup[:name]}."
+        $logger.warn "Creating task group #{taskgroup[:name]}."
         tg = add_new_task_group(api, cookie, abbrev, taskgroup[:name], pers)
       else
-        $logger.debug "Updating existing task group #{taskgroup[:name]}"
+        $logger.warn "Updating existing task group #{taskgroup[:name]}"
         tg = update_task_group(api, cookie, tg, pers)
       end
     end
@@ -524,7 +524,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
     tgname = tgnames[tgshortname][:name]
     tg = find_task_group(api, tgname)
     unless tg
-      $logger.warn "Taskgroup #{tgname} not found"
+      $logger.error "Taskgroup #{tgname} not found"
       next
     end
     $logger.debug tgname
@@ -550,10 +550,10 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
           award: projrow && projrow[14]&.value
         }
         if opts.delete_existing? && !proj.nil?
-          $logger.info "Deleting existing project #{desig}"
+          $logger.warn "Deleting existing project #{desig}"
           delete_project(api, cookie, tg, proj)
         end
-        $logger.info "Adding project #{desig} to TG #{tgname}"
+        $logger.warn "Adding project #{desig} to TG #{tgname}"
         proj = add_project_to_tg(api, cookie, tg, newproj)
         unless proj
           $logger.error "Addition failed."
@@ -577,7 +577,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
           add_events_to_project(api, cookie, proj, events)
         end
       else
-        $logger.info "Project #{desig} exists as #{proj['short_title']}"
+        $logger.debug "Project #{desig} exists as #{proj['short_title']}"
       end
 
     else
@@ -740,7 +740,7 @@ def update_projects_from_active_pars(api, cookie, dev_host, user, pw)
       # Want desig to match projects named exactly that or desig-REV
       proj = find_project_in_tg(api, nil, desig, match_style: :allow_rev)
       if proj.nil?
-        $logger.warn("Expected project #{desig} (from Active PARs) not found in database")
+        $logger.error("Expected project #{desig} (from Active PARs) not found in database")
         next
       else
         $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
@@ -829,23 +829,23 @@ def add_sponsor_ballots_from_dev_server(api, cookie, dev_host, user, pw, onlydes
       # Want desig to match projects named exactly that or desig-REV
       proj = find_project_in_tg(api, nil, desig, match_style: :allow_rev)
       if proj.nil?
-        $logger.warn("Expected project #{desig} (from SB Notification) not found in database")
+        $logger.error("Expected project #{desig} (from SB Notification) not found in database")
         next
       else
         $logger.debug("Matching Sponsor Ballot #{desig} to project #{proj['designation']}")
       end
       startev = find_event_in_proj(api, proj, 'PAR Approval')
       if startev.empty?
-        $logger.warn("Project #{desig} has no PAR Approval date")
+        $logger.error("Project #{desig} has no PAR Approval date")
         next
       end
       if events.first[:date] < Date.parse(startev&.first['date'])
-        $logger.info("Not adding sponsor ballot on #{desig} as it starts before #{startev&.first['date']}")
+        $logger.debug("Not adding sponsor ballot on #{desig} as it starts before #{startev&.first['date']}")
         next
       end
       endev = find_event_in_proj(api, proj, 'PAR Expiry')
       if endev.empty?
-        $logger.warn("Project #{desig} has no PAR Expiry date")
+        $logger.error("Project #{desig} has no PAR Expiry date")
         next
       end
       if events.first[:date] > Date.parse(endev&.first['date'])
@@ -935,7 +935,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
       # Want desig to match projects named exactly that
       proj = find_project_in_tg(api, nil, desig)
       if proj.nil?
-        $logger.warn("Expected project #{desig} (from PAR report) not found in database: adding it")
+        $logger.error("Expected project #{desig} (from PAR report) not found in database: adding it")
         # Find the task group in the task_groups list from the projects[desig] entry
         tg = task_groups.detect { |t| t['abbrev'] == projects[desig] }
         unless tg
@@ -972,7 +972,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
         $logger.debug("Matching PAR #{desig} to project #{proj['designation']}")
       end
       # Overwrite existing project information and add new events to the project.
-      $logger.info("Updating project #{proj['designation']} and adding up to #{events.count} events")
+      $logger.warn("Updating project #{proj['designation']} and adding up to #{events.count} events")
       add_events_to_project(api, cookie, proj, events) unless events.empty?
       update_project(api, cookie, proj, { title: fulltitle, par_url: par_url }) unless fulltitle.empty? and
                                                                                        par_url.empty?
@@ -1011,7 +1011,7 @@ def parse_announcement(url, creds)
   # NAME
   matches = /^TO:\s*(?<name>.+)\n/.match(text)
   unless matches
-    $logger.warn "Parse error (TO) in Request #{url}"
+    $logger.error "Parse error (TO) in Request #{url}"
     return nil
   end
   fields.merge!(Hash[matches.names.zip(matches.captures)])
@@ -1108,7 +1108,7 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
 
         announcement = parse_announcement(url, mtarch_creds)
         if announcement.nil?
-          $logger.warn("Couldn't parse ballot announcement #{url}")
+          $logger.error("Couldn't parse ballot announcement #{url}")
           num_unparseable_announcements += 1
           next
         end
@@ -1123,12 +1123,12 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
         # Want desig to match projects named exactly that
         proj = find_project_in_tg(api, nil, desig)
         if proj.nil?
-          $logger.warn("Expected project #{desig} (from mailserv) not found in database: #{url}")
+          $logger.error("Expected project #{desig} (from mailserv) not found in database: #{url}")
           next
         end
         startev = find_event_in_proj(api, proj, 'PAR Approval')
         if startev.empty?
-          $logger.warn("Project #{desig} has no PAR Approval date")
+          $logger.error("Project #{desig} has no PAR Approval date")
           next
         end
         if announcement['date'] < Date.parse(startev&.first['date'])
@@ -1165,6 +1165,7 @@ begin
   opts = Slop.parse do |o|
     o.string '-c', '--config', 'configuration YAML file name', default: 'secrets.yml'
     o.bool   '-d', '--debug', 'debug mode'
+    o.integer '-l', '--loglevel', 'log level 0=debug; 1=info; 2=warn; 3=error; 4=fatal', default: Logger::WARN
     o.bool   '-x', '--delete-existing', 'delete existing projects before creating new ones'
     o.bool   '-u', '--update', 'update existing projects from the Insanity spreadsheet'
     o.bool   '-t', '--task-groups', 'Update the Task Groups from the Insanity spreadsheet'
@@ -1183,7 +1184,7 @@ begin
   #
   $DEBUG = opts.debug?
   $logger = Logger.new(STDOUT)
-  $logger.level = Logger::INFO
+  $logger.level = opts[:loglevel]
   $logger.level = Logger::DEBUG if $DEBUG
 
   if $DEBUG
