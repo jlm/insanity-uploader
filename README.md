@@ -55,6 +55,8 @@ Without any options, the script just logs in to the maintenance database and exi
   and from the linked HTML-format PAR.
 * `--mailserv` (abbreviated `-m`): Log in to the 802.1 email archive and scan it for messages announcing task group and
   working group ballots.  The ballot dates are recorded in the project event list.
+* `--drafts` (abbreviated `-D`): for each project in the database, examine the "files url" directory looking
+  for drafts.  Find the latest draft and record the draft number and URL in the project database.
 * `--only par-list` (abbreviated `-O`): for the `--sb` and `--mailserv` options, the PARs considered are limited to
   those listed in the argument, which can be space- or comma-separated.
 * `--dryrun` (abbreviated `-n`): don't make any changes to the database.  This may not do what you expect, as

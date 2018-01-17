@@ -27,6 +27,7 @@ require 'rubyXL'
 require 'slop'
 require 'yaml'
 require 'open-uri'
+require 'dirtp'
 
 class String
   def casecmp?(other)
@@ -1168,6 +1169,43 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
 rescue StopIteration
 end
 
+####
+# Scan the archive server for drafts of each project and record the latest draft number.
+####
+# @param [RestClient::Resource] api
+# @param [cookie] cookie
+# @param [string] user
+# @param [string] pw
+# @param [Array<String>] onlydesigs
+def scan_for_drafts(api, cookie, user, pw, onlydesigs)
+  # Read them all at once.  That doesn't scale though.
+  projects = JSON.parse(api["projects"].get accept: :json)
+  projects.each do |proj|
+    desig = proj['designation']
+    url = proj['files_url']
+    next if onlydesigs && ! (onlydesigs.include? desig.downcase)
+    if url.nil? || url.empty?
+      $logger.error("#{desig}: files_url not set")
+      next
+    end
+    url += '/' unless url[-1] == '/'
+    puts "#{desig}: #{url}" if $DEBUG
+    begin
+      tptab = TPTable.new(url, creds: [user, pw])
+      files = tptab.parse_dir()
+    rescue => e
+      $logger.error "scan_for_drafts => exception #{e.class.name} : #{e.message}"
+      next
+    end
+    latest = files.reject {|f| ! /d\d+(-\d+)?\.pdf$/.match f[:name]}[-1]
+    matches = /(?<draftno>d\d+(-\d+)?)\.pdf$/.match(latest[:name])
+    draftno = matches[:draftno].gsub('-', '.').upcase
+    puts "#{desig}: #{files.count} files" if $DEBUG
+    $logger.warn("Updating #{desig}: draft no #{draftno}: #{latest[:href]}")
+    update_project(api, cookie, proj, { draft_no: draftno, draft_url: latest[:href] })
+  end
+end
+
 #
 # Main program
 #
@@ -1186,6 +1224,7 @@ begin
     o.bool   '-m', '--mailserv', 'update from mailing list'
     o.bool   '-p', '--people', 'create or update people from the Insanity spreadsheet\'s People tab'
     o.string '-O', '--only', 'limit some actions to the named project designations'
+    o.bool   '-D', '--drafts', 'scan the project archive for drafts and adjust the current draft number'
     o.bool   '-n', '--dryrun', 'do not make changes to the database: just show what would have happened'
   end
 
@@ -1240,5 +1279,9 @@ begin
                                      config['email_start'],
                                      config['archive_user'], config['archive_password'],
                                      config['blacklist'], only, config['email_limit'].to_i)
+  end
+
+  if opts.drafts?
+    scan_for_drafts(maint, maint_cookie, config['archive_user'], config['archive_password'], only)
   end
 end
