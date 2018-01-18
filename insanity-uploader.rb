@@ -1198,6 +1198,10 @@ def scan_for_drafts(api, cookie, user, pw, onlydesigs)
       next
     end
     latest = files.reject {|f| ! /d\d+(-\d+)?\.pdf$/.match f[:name]}[-1]
+    unless latest
+      $logger.debug("#{desig}: no drafts!")
+      next
+    end
     matches = /(?<draftno>d\d+(-\d+)?)\.pdf$/.match(latest[:name])
     draftno = matches[:draftno].gsub('-', '.').upcase
     puts "#{desig}: #{files.count} files" if $DEBUG
