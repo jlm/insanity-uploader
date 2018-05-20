@@ -1099,7 +1099,7 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
           num_responses += 1
           next
         end
-        mtchdata = /^\[802.1 - (?<number>\d+)\]\s+(?<type>\w+)\sgroup\s+(?<recirc>recirc\w*)?\s*ballot\s+of\s+(?<draft>P?802\S+)/i.match(titlestr)
+        mtchdata = /^\[802.1 - (?<number>\d+)\]\s+(?<type>\w+)\sgroup\s+(?<recirc>recirc\w*)?\s*ballot\s+(of|for)\s+(?<draft>P?802\S+)/i.match(titlestr)
         unless mtchdata
           num_malformed_title += 1
           next
