@@ -35,6 +35,8 @@ class String
   end
 end
 
+PARPATTERN = /802.1[a-zA-Z]+|802[a-zA-Z]|802$/
+
 ####
 # Log in to the Maintenance Database API
 ####
@@ -729,7 +731,7 @@ def update_projects_from_active_pars(api, cookie, dev_host, user, pw)
     searchresult.parser.css('tr.b_data_row').each do |row|
       tds = row.css('td')
       desig = tds[1].children.first.children.to_s
-      next unless /802.1[a-zA-Z]+|802[a-zA-Z]/.match(desig)
+      next unless PARPATTERN.match(desig)
       $logger.debug("Considering project #{desig}")
       events = []
       par_link = tds[1].children.first.attributes['href'].to_s
@@ -918,7 +920,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
     searchresult.parser.css('tr.b_data_row').each do |row|
       tds = row.css('td')
       desig = tds[0].children.first.children.to_s
-      next unless /802.1[a-zA-Z]+|802[a-zA-Z]/.match(desig)
+      next unless PARPATTERN.match(desig)
       partype = tds[1].children.to_s
       $logger.debug("Considering project #{desig} (#{partype})")
       events = []
