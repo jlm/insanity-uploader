@@ -713,6 +713,9 @@ def update_projects_from_active_pars(api, cookie, dev_host, user, pw)
   f.x1 = user
   f.x2 = pw
   f.f0 = '3' # myproject
+  f.checkboxes_with name: 'privacyconsent' do |cbxs|
+    cbxs.first.check
+  end
   page = agent.submit(f, f.buttons.first)
   # puts page.pretty_print_inspect if $DEBUG
   nextlink = URI::HTTP.build(host: dev_host, path: '/pub/active-pars', query: 's=802.1')
@@ -784,6 +787,9 @@ def add_sponsor_ballots_from_dev_server(api, cookie, dev_host, user, pw, onlydes
   f.x1 = user
   f.x2 = pw
   f.f0 = '3' # myproject
+  f.checkboxes_with name: 'privacyconsent' do |cbxs|
+    cbxs.first.check
+  end
   page = agent.submit(f, f.buttons.first)
   # puts page.pretty_print_inspect if $DEBUG
   # Find the "Notifications" or Messages page.
@@ -894,6 +900,9 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
   f.x1 = user
   f.x2 = pw
   f.f0 = '3' # myproject
+  f.checkboxes_with name: 'privacyconsent' do |cbxs|
+      cbxs.first.check
+    end
   page = agent.submit(f, f.buttons.first)
   # puts page.pretty_print_inspect if $DEBUG
 
