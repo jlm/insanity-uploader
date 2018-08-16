@@ -1351,14 +1351,14 @@ begin
                                         config['dev_pw'], only)
   end
 
+  if opts.drafts?
+    scan_for_drafts(maint, maint_cookie, config['archive_user'], config['archive_password'], only)
+  end
+
   if opts.mailserv?
     update_projects_from_mail_server(maint, maint_cookie, config['email_archive'],
                                      config['email_start'],
                                      config['archive_user'], config['archive_password'],
                                      config['blacklist'], only, config['email_limit'].to_i)
-  end
-
-  if opts.drafts?
-    scan_for_drafts(maint, maint_cookie, config['archive_user'], config['archive_password'], only)
   end
 end
