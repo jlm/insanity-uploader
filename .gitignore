@@ -24,6 +24,7 @@ docker-cloud-stack*.yml
 secrets.yml
 secrets-localhost.yml
 secrets-prodhost.yml
+secrets-staging.yml
 # Ignore linked files for rails (JLM 150513)
 config/database.yml
 config/secrets.yml
