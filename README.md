@@ -6,7 +6,13 @@ This Ruby script adds projects to the database of projects maintained in the
 Data can be drawn from the Insanity Spreadsheet which the script can parse,
 from the IEEE Standards myProject system which the script can log in to and query, and from the
 802.1 Email reflector which the script can parse for ballot announcements. 
-It then parses and uploads these to the web application.  The maintenance
+It then parses and uploads these to the web application, recording them as status updates
+and events.  It can also parse the 802.1 document library to find the latest draft
+standards and create database events to record their posting.
+
+New events detected by the script can be posted as updates to a Slack channel.
+
+The maintenance
 database is a Ruby on Rails web app which exposes a JSON API as well as a web-based user interface.
 
 The email archive is managed using Listserv which generates an index on HTML pages.
@@ -57,6 +63,9 @@ Without any options, the script just logs in to the maintenance database and exi
   working group ballots.  The ballot dates are recorded in the project event list.
 * `--drafts` (abbreviated `-D`): for each project in the database, examine the "files url" directory looking
   for drafts.  Find the latest draft and record the draft number and URL in the project database.
+* `--slackpost` (abbreviated `-z`): when new events are detected (such as ballot announcements
+  or new drafts), send messages to a Slack channel through a Slack webhook integration.
+  Events are only posted if they are less than 4 days old and are being newly added.
 * `--only par-list` (abbreviated `-O`): for the `--sb` and `--mailserv` options, the PARs considered are limited to
   those listed in the argument, which can be space- or comma-separated.
 * `--dryrun` (abbreviated `-n`): don't make any changes to the database.  This may not do what you expect, as
