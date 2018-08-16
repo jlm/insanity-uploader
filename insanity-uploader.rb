@@ -65,6 +65,12 @@ end
 # Post a message to Slack about an event
 ####
 def slack_post_event(proj, event, type: nil)
+  return unless $slack
+  datediff = (Date.today - event[:date]).to_i
+  if (datediff > 3) || (datediff < -1)
+    $logger.info "Not slackposting event because #{event[:date].to_s} is out of range: #{event[:description]}"
+    return
+  end
   slackdata = {
       "attachments": [
           {
@@ -92,7 +98,7 @@ def slack_post_event(proj, event, type: nil)
   slackdata[:attachments][0][:fields] << { "title": "End date", "value": slack_date(event[:end_date]), "short": true } if event[:end_date]
   slackdata[:attachments][0][:fields] << { "title": "Draft", "value": "<#{proj['draft_url']}|#{proj['draft_no']}>", "short": true } if proj['draft_url']
 
-  res = $slack.post slackdata.to_json, { content_type: :json, accept: :json} if $slack
+  res = $slack.post slackdata.to_json, { content_type: :json, accept: :json}
 end
 
 ####
@@ -217,7 +223,7 @@ def add_events_to_project(api, cookie, proj, events)
       if ev.empty?
         $logger.warn("Adding event #{event[:name]} to project #{proj['designation']}")
         res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
-        slack_post_event(proj, event) if (Date.today - event[:date]).to_i < 4
+        slack_post_event(proj, event)
       else
         ev.each do |e|
           if e['name'] == event[:name] && e['date'].to_s == event[:date].to_date.to_s # dropped end-date check
@@ -229,7 +235,7 @@ def add_events_to_project(api, cookie, proj, events)
         unless found
           $logger.warn("Adding extra event #{event[:name]} to project #{proj['designation']}")
           res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
-          slack_post_event(proj, event, type: :extra) if (Date.today - event[:date]).to_i < 4
+          slack_post_event(proj, event, type: :extra)
         end
       end
     end
