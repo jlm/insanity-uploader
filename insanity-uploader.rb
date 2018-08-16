@@ -55,6 +55,47 @@ def login(api, username, password)
 end
 
 ####
+# Format a date suitable for a Slack message: https://api.slack.com/docs/message-formatting#formatting_dates
+####
+def slack_date(date)
+  "<!date^#{date.to_time.to_i}^{date_pretty}|#{date.strftime('%c')}>"
+end
+
+####
+# Post a message to Slack about an event
+####
+def slack_post_event(proj, event, type: nil)
+  slackdata = {
+      "attachments": [
+          {
+              "fallback": event[:description],
+              "color": "good",
+              #"author_name": "#{newreq['name']}",
+              #"author_link": "mailto:#{newreq['email']}",
+              "pretext": "802.1 announcement",
+              "title": event[:description],
+              "title_link": event[:url],
+              "text": proj['title'],
+              "fields": [
+                  {
+                      "title": "Start date",
+                      "value": slack_date(event[:date]),
+                      "short": true
+                  }
+              ],
+              "footer": "802.1",
+              "footer_icon": "https://platform.slack-edge.com/img/default_application_icon.png",
+              "ts": event[:date].to_time.to_i
+          }
+      ]
+  }
+  slackdata[:attachments][0][:fields] << { "title": "End date", "value": slack_date(event[:end_date]), "short": true } if event[:end_date]
+  slackdata[:attachments][0][:fields] << { "title": "Draft", "value": "<#{proj['draft_url']}|#{proj['draft_no']}>", "short": true } if proj['draft_url']
+
+  res = $slack.post slackdata.to_json, { content_type: :json, accept: :json} if $slack
+end
+
+####
 # Search the Database for a task group with the specified name and return the parsed item
 ####
 def find_task_group(api, name)
@@ -176,9 +217,11 @@ def add_events_to_project(api, cookie, proj, events)
       if ev.empty?
         $logger.warn("Adding event #{event[:name]} to project #{proj['designation']}")
         res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
+        slack_post_event(proj, event) if (Date.today - event[:date]).to_i < 4
       else
         ev.each do |e|
-          if e['name'] == event[:name] && e['date'].to_s == event[:date].to_s && e['end_date'].to_s == event[:end_date].to_s
+          if e['name'] == event[:name] && e['date'].to_s == event[:date].to_date.to_s # dropped end-date check
+            # the end date check was hard because it's blank sometimes
             found = true
             $logger.info("Found matching event #{event[:name]} for project #{proj['designation']}")
           end
@@ -186,6 +229,7 @@ def add_events_to_project(api, cookie, proj, events)
         unless found
           $logger.warn("Adding extra event #{event[:name]} to project #{proj['designation']}")
           res = api["task_groups/#{tgid}/projects/#{projid}/events"].post event.to_json, option_hash unless $dryrun
+          slack_post_event(proj, event, type: :extra) if (Date.today - event[:date]).to_i < 4
         end
       end
     end
@@ -1080,8 +1124,8 @@ end
 # noinspection RubyInstanceMethodNamingConvention
 def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw, blacklist, onlydesigs, limit)
   #
-  # Parse each index page of the 802.1 Maintenance Reflector Archive
-  # and find the maintenance items
+  # Parse each index page of the 802.1 Email Reflector Archive
+  # and find things like ballot announcements.
   #
   em_arch_url = arch_url + '/' + mailstart
   mtarch_creds = [user, pw]
@@ -1159,7 +1203,8 @@ def update_projects_from_mail_server(api, cookie, arch_url, mailstart, user, pw,
           date: announcement['date'],
           end_date: announcement['closing'],
           name: "#{/task/i.match(btype) ? 'TG' : 'WG'} #{recirc ? 'recirc' : 'ballot'}: D#{draftno}",
-          description: "#{btype} group #{recirc ? 'recirculation ' : ''}ballot of #{draft}"
+          description: "#{btype} group #{recirc ? 'recirculation ' : ''}ballot of #{draft}",
+          url: url
         }]
         add_events_to_project(api, cookie, proj, events)
         num_events_added += 1
@@ -1208,15 +1253,22 @@ def scan_for_drafts(api, cookie, user, pw, onlydesigs)
       $logger.error "scan_for_drafts => exception #{e.class.name} : #{e.message}"
       next
     end
-    latest = files.reject {|f| ! /d\d+(-\d+)?\.pdf$/.match f[:name]}[-1]
+    latest = files.reject {|f| ! /[dD]\d+(-\d+)?\.pdf$/.match f[:name]}[-1]
+    # XXX TODO: the clever line above gets the last entry in the file list which was sorted in alphabetical order
+    # by the webserver.  Often that works to get the latest draft, but not if the drafts change between lower-case
+    # and upper-case (e.g. 802-1Qcr-d0-2.pdf scans alphabetically later than 802-1Qcr-D0-5.pdf)!
+    # An alternative would be to sort the entries by file modification time, in the files array.
     unless latest
       $logger.debug("#{desig}: no drafts!")
       next
     end
-    matches = /(?<draftno>d\d+(-\d+)?)\.pdf$/.match(latest[:name])
+    matches = /(?<draftno>[dD]\d+(-\d+)?)\.pdf$/.match(latest[:name])
     draftno = matches[:draftno].gsub('-', '.').upcase
     puts "#{desig}: #{files.count} files" if $DEBUG
+    datestr = latest[:date].to_date.to_s
     $logger.warn("Updating #{desig}: draft no #{draftno}: #{latest[:href]}")
+    events = [{ date: latest[:date], name: "Draft: #{draftno}", description: "Draft #{draftno}: #{datestr}", url: latest[:href] }]
+    add_events_to_project(api, cookie, proj, events)
     update_project(api, cookie, proj, { draft_no: draftno, draft_url: latest[:href] })
   end
 end
@@ -1241,6 +1293,7 @@ begin
     o.string '-O', '--only', 'limit some actions to the named project designations'
     o.bool   '-D', '--drafts', 'scan the project archive for drafts and adjust the current draft number'
     o.bool   '-n', '--dryrun', 'do not make changes to the database: just show what would have happened'
+    o.bool   '-z', '--slackpost', 'post alerts to Slack for new items'
   end
 
   config = YAML.load(File.read(opts[:config]))
@@ -1267,6 +1320,15 @@ begin
   # Save the session cookie
   maint_cookie = {}
   res.cookies.each { |ck| maint_cookie[ck[0]] = ck[1] if /_session/.match(ck[0]) }
+
+  #
+  # If we are posting to Slack, open the Slack webhook
+  #
+  if opts[:slackpost]
+    $slack = RestClient::Resource.new(config['slack_webhook'])
+  else
+    $slack = nil
+  end
 
   parse_insanity_spreadsheet(maint, maint_cookie, opts[:filepath], opts) if opts[:filepath]
 
