@@ -888,22 +888,24 @@ def add_sponsor_ballots_from_dev_server(api, cookie, dev_host, user, pw, onlydes
       else
         $logger.debug("Matching Sponsor Ballot #{desig} to project #{proj['designation']}")
       end
+
       startev = find_event_in_proj(api, proj, 'PAR Approval')
       if startev.empty?
         $logger.error("Project #{desig} has no PAR Approval date")
         next
       end
       if events.first[:date] < Date.parse(startev&.first['date'])
-        $logger.debug("Not adding sponsor ballot on #{desig} as it starts before #{startev&.first['date']}")
+        $logger.debug("Not adding sponsor ballot on #{desig} as it starts before #{startev&.first['date']}: #{notification_url}")
         next
       end
+
       endev = find_event_in_proj(api, proj, 'PAR Expiry')
       if endev.empty?
         $logger.error("Project #{desig} has no PAR Expiry date")
         next
       end
       if events.first[:date] > Date.parse(endev&.first['date'])
-        $logger.info("Not adding sponsor ballot on #{desig} as it starts after #{endev&.first['date']}")
+        $logger.info("Not adding sponsor ballot on #{desig} as it starts after #{endev&.first['date']}: #{notification_url}")
         next
       end
 
