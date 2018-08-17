@@ -68,7 +68,7 @@ def slack_post_event(proj, event, type: nil)
   return unless $slack
   datediff = (Date.today - event[:date]).to_i
   if (datediff > 3) || (datediff < -1)
-    $logger.info "Not slackposting event because #{event[:date].to_s} is out of range: #{event[:description]}"
+    $logger.debug "Not slackposting event because #{event[:date].to_s} is out of range: #{event[:description]}"
     return
   end
   slackdata = {
@@ -98,6 +98,7 @@ def slack_post_event(proj, event, type: nil)
   slackdata[:attachments][0][:fields] << { "title": "End date", "value": slack_date(event[:end_date]), "short": true } if event[:end_date]
   slackdata[:attachments][0][:fields] << { "title": "Draft", "value": "<#{proj['draft_url']}|#{proj['draft_no']}>", "short": true } if proj['draft_url']
 
+  $logger.info "Slackposting date: #{event[:date].to_s} event: #{event[:description]}"
   res = $slack.post slackdata.to_json, { content_type: :json, accept: :json}
 end
 
@@ -229,7 +230,7 @@ def add_events_to_project(api, cookie, proj, events)
           if e['name'] == event[:name] && e['date'].to_s == event[:date].to_date.to_s # dropped end-date check
             # the end date check was hard because it's blank sometimes
             found = true
-            $logger.info("Found matching event #{event[:name]} for project #{proj['designation']}")
+            $logger.debug("Found matching event #{event[:name]} for project #{proj['designation']}")
           end
         end
         unless found
@@ -785,7 +786,7 @@ def update_projects_from_active_pars(api, cookie, dev_host, user, pw)
       $logger.debug("Considering project #{desig}")
       events = []
       par_link = tds[1].children.first.attributes['href'].to_s
-      par_url = tds[3].children.first.children.to_s
+      par_url = tds[3]&.children&.first&.children.to_s
       par_approval = safe_date(tds[4].children.css('noscript').children.to_s)
       events << { date: par_approval, name: 'PAR Approval', description: 'PAR Approval: ' + par_approval.to_s } if par_approval
 
@@ -1000,7 +1001,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
       # Want desig to match projects named exactly that
       proj = find_project_in_tg(api, nil, desig)
       if proj.nil?
-        $logger.error("Expected project #{desig} (from PAR report) not found in database: adding it")
+        $logger.warn("Expected project #{desig} (from PAR report) not found in database: adding it")
         # Find the task group in the task_groups list from the projects[desig] entry
         tg = task_groups.detect { |t| t['abbrev'] == projects[desig] }
         unless tg
@@ -1033,6 +1034,7 @@ def update_projects_from_par_report(api, cookie, dev_host, user, pw, projects, t
           next_action: 'EditorsDraft' # This is a kludge
         }
         proj = add_project_to_tg(api, cookie, tg, newproj)
+        $logger.fatal "Further progress impossible in dryrun mode!" if $dryrun
         unless proj
           $logger.error "Addition failed."
           raise('ProjAdditionFailed')
