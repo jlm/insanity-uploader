@@ -6,9 +6,10 @@ COPY . .
 
 CMD [ \
      "./insanity-uploader.rb", \
-     "--config", "secrets-prodhost.yml", \
+     "--config", "secrets-staging.yml", \
+     "--dryrun", \
+     "-l", "1", \
      "--par-report","http://ieee802.org/1/files/public/insanity/pars-to-add.yml", \
-     "--active", \
      "--mailserv", \
      "--sb", \
      "--drafts", \
