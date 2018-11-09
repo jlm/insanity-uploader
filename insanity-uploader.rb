@@ -79,7 +79,7 @@ def slack_post_event(proj, event, type: nil)
               #"author_name": "#{newreq['name']}",
               #"author_link": "mailto:#{newreq['email']}",
               "pretext": "802.1 announcement",
-              "title": event[:description],
+              "title": proj['designation'] + ": " + event[:description],
               "title_link": event[:url],
               "text": proj['title'],
               "fields": [
