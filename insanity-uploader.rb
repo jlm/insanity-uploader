@@ -96,7 +96,9 @@ def slack_post_event(proj, event, type: nil)
       ]
   }
   slackdata[:attachments][0][:fields] << { "title": "End date", "value": slack_date(event[:end_date]), "short": true } if event[:end_date]
-  slackdata[:attachments][0][:fields] << { "title": "Draft", "value": "<#{proj['draft_url']}|#{proj['draft_no']}>", "short": true } if proj['draft_url']
+  if proj['draft_url'] && event[:event_type] != "draft"
+    slackdata[:attachments][0][:fields] << { "title": "Draft", "value": "<#{proj['draft_url']}|#{proj['draft_no']}>", "short": true }
+  end
 
   $logger.info "Slackposting date: #{event[:date].to_s} event: #{event[:description]}"
   res = $slack.post slackdata.to_json, { content_type: :json, accept: :json}
@@ -1277,7 +1279,7 @@ def scan_for_drafts(api, cookie, user, pw, onlydesigs)
     puts "#{desig}: #{files.count} files" if $DEBUG
     datestr = latest[:date].to_date.to_s
     $logger.warn("Updating #{desig}: draft no #{draftno}: #{latest[:href]}")
-    events = [{ date: latest[:date], name: "Draft: #{draftno}", description: "Draft #{draftno}: #{datestr}", url: latest[:href] }]
+    events = [{ date: latest[:date], name: "Draft: #{draftno}", description: "Draft #{draftno}: #{datestr}", url: latest[:href], event_type: "draft" }]
     add_events_to_project(api, cookie, proj, events)
     update_project(api, cookie, proj, { draft_no: draftno, draft_url: latest[:href] })
   end
