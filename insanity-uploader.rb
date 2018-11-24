@@ -133,6 +133,7 @@ end
 # allowing case variation.
 ####
 def find_project_in_tg(api, tg, designation, match_style: :exact_match)
+  designation = designation.to_s # force it to be a string
   if tg.nil?
     search_result = api["projects"].get accept: :json, params: { search: designation }
   else
@@ -493,6 +494,27 @@ def update_task_group(api, cookie, tgtoupdate, person)
     tg = JSON.parse(res.body)
   end
   tg
+end
+
+####
+# Create a new motion in an existing Meeting
+####
+def add_motion_to_mtg(api, cookie, mtg, newmotion)
+  mtgid = mtg['id']
+  option_hash = { content_type: :json, accept: :json, cookies: cookie }
+  begin
+    res = api["meetings/#{mtgid}/motions"].post newmotion.to_json, option_hash unless $dryrun
+    twit = 11
+  rescue => e
+    $logger.fatal "add_motion_to_mtg => exception #{e.class.name} : #{e.message}"
+    if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
+      eje.each do |k, v|
+        $logger.fatal "#{k}: #{v.first}"
+      end
+      exit(1)
+    end
+  end
+  res && JSON.parse(res)
 end
 
 ####
@@ -1285,6 +1307,57 @@ def scan_for_drafts(api, cookie, user, pw, onlydesigs)
   end
 end
 
+####
+# Parse a spreadsheet of committee motions and upload them.
+####
+# @param [RestClient::Resource] api
+# @param [cookie] cookie
+# @param [string] motionfilepath
+# @param [Array<String>] onlymeetings
+def parse_motion_spreadsheet(api, cookie, motionfilepath, onlymeetings)
+  book = RubyXL::Parser.parse motionfilepath
+  # book.worksheets.each do |w|
+  # puts w.sheet_name
+  # end
+  book.each do |sheet|
+    next if onlymeetings && ! (onlymeetings.include? sheet.sheet_name)
+    next unless /^\d{4}-\d{2}$/ =~ sheet.sheet_name
+    mtgdate = Date.parse(sheet.sheet_name + '-01')
+    search_result = api['meetings'].get accept: :json, params: { search: mtgdate.to_s }
+    mtgs = JSON.parse(search_result.body)
+    unless mtgs && mtgs[0]
+      $logger.fatal "parse_motion_spreadsheet: meeting dated #{mtgdate.to_s} not found"
+      exit(1)
+    end
+    mtg = mtgs[0]
+    twit = 112
+    i = 1
+    sheet[1..sheet.count - 1].each do |motrow|
+      i += 1
+      projname = motrow && motrow[9]&.value
+      proj = projname && find_project_in_tg(api, nil, projname)
+      if projname && ! proj
+        $logger.error("parse_motion_spreadsheet: project #{projname} not found in database")
+        next
+      end
+      newmotion = {
+        number: motrow && motrow[0]&.value,
+        date: motrow && motrow[1] && motrow[1].value,
+        mover: motrow && motrow[2]&.value,
+        seconder: motrow && motrow[3]&.value,
+        approve: motrow && motrow[4]&.value,
+        disapprove: motrow && motrow[5]&.value,
+        abstain: motrow && motrow[6]&.value,
+        result: motrow && motrow[7]&.value,
+        motion_text: motrow && motrow[8]&.value,
+        project_id: proj && proj['id']
+      }
+      twit = 113
+      add_motion_to_mtg(api, cookie, mtg, newmotion)
+    end
+  end
+end
+
 #
 # Main program
 #
@@ -1306,6 +1379,7 @@ begin
     o.bool   '-D', '--drafts', 'scan the project archive for drafts and adjust the current draft number'
     o.bool   '-n', '--dryrun', 'do not make changes to the database: just show what would have happened'
     o.bool   '-z', '--slackpost', 'post alerts to Slack for new items'
+    o.string '-M', '--motions', 'parse a spreadsheet of committee motions and upload them'
   end
 
   config = YAML.load(File.read(opts[:config]))
@@ -1372,5 +1446,9 @@ begin
                                      config['email_start'],
                                      config['archive_user'], config['archive_password'],
                                      config['blacklist'], only, config['email_limit'].to_i)
+  end
+
+  if opts[:motions]
+    parse_motion_spreadsheet(maint, maint_cookie, opts[:motions], only)
   end
 end
