@@ -329,8 +329,7 @@ def parse_motion(motion_string)
 end
 
 ###
-# Parse the Last Motion and Next Action from the spreadsheet into a standard form.
-# If you don't give a value, you get 'Done'.
+# Parse the Designation from the spreadsheet into a standard form.
 ###
 # @param [String] desig_string
 def parse_desig(desig_string)
@@ -352,7 +351,7 @@ def parse_desig(desig_string)
 end
 
 ###
-# Parse the Last Motion and Next Action from the spreadsheet into a standard form.
+# Parse the short date string from the spreadsheet into a standard form.
 # If you don't give a value, you get 'Done'.
 ###
 # @param [String] short_date_string
@@ -649,7 +648,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
         end
         if projrow && projrow[12]&.value
           date = parse_short_date(projrow[12]&.value)
-          events << { date: date, end_date: date + 30, name: 'MEC', description: "Manadatory Editorial Co-ordination: #{date}" }
+          events << { date: date, end_date: date + 30, name: 'MEC', description: "Mandatory Editorial Co-ordination: #{date}" }
         end
 
         unless events.empty?
