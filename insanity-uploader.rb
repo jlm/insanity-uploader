@@ -165,9 +165,17 @@ def add_project_to_tg(api, cookie, tg, newproj)
     twit = 11
   rescue => e
     $logger.fatal "add_project_to_tg => exception #{e.class.name} : #{e.message}"
-    if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
-      eje.each do |k, v|
-        $logger.fatal "#{k}: #{v.first}"
+    if (ej = JSON.parse(e.response))
+      if ej.is_a? Hash
+        if (eje = ej['errors'])
+          eje.each do |k, v|
+            $logger.fatal "#{k}: #{v.first}"
+          end
+        end
+      elsif ej.is_a? Array
+        ej.each do |el|
+          $logger.fatal "  #{el}"
+        end
       end
       exit(1)
     end
@@ -187,9 +195,17 @@ def update_project(api, cookie, proj, update)
     twit = 11
   rescue => e
     $logger.fatal "update_project => exception #{e.class.name} : #{e.message}"
-    if (ej = JSON.parse(e.response)) && (eje = ej['errors'])
-      eje.each do |k, v|
-        $logger.fatal "#{k}: #{v.first}"
+    if (ej = JSON.parse(e.response))
+      if ej.is_a? Hash
+        if (eje = ej['errors'])
+          eje.each do |k, v|
+            $logger.fatal "#{k}: #{v.first}"
+          end
+        end
+      elsif ej.is_a? Array
+        ej.each do |el|
+          $logger.fatal "#{el}"
+        end
       end
       exit(1)
     end
@@ -635,7 +651,12 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
           delete_project(api, cookie, tg, proj)
         end
         $logger.warn "Adding project #{desig} to TG #{tgname}"
-        proj = add_project_to_tg(api, cookie, tg, newproj)
+        if proj.nil?
+          proj = add_project_to_tg(api, cookie, tg, newproj)
+        else
+          update_project(api, cookie, proj, newproj)
+        end
+
         unless proj
           $logger.error "Addition failed."
           raise('ProjAdditionFailed')
