@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 ####
-# Copyright 2016-2017 John Messenger
+# Copyright 2016-2019 John Messenger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -542,6 +542,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
   # puts w.sheet_name
   # end
 
+  # Process the "People" sheet
   if opts.people?
     peepsheet = book['People']
     people = []
@@ -571,6 +572,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
     end
   end
 
+  # Provess the "TaskGroups" sheet
   tgsheet = book['TaskGroups']
   tgnames = {}
   tgsheet[(i = 0)..tgsheet.count - 1].each do |tgrow|
@@ -596,6 +598,7 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
     end
   end
 
+  # Process the "Projects" sheet
   projsheet = book['Projects']
   projsheet[(i = 1)..projsheet.count - 1].each do |projrow|
     tgshortname = projrow && projrow[9]&.value
