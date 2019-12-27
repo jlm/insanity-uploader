@@ -349,17 +349,17 @@ end
 ###
 # @param [String] desig_string
 def parse_desig(desig_string)
-  if (result = /P*(802(\.(\d+))*([A-Z]+|[a-z]+))([a-z]*)/.match(desig_string))
-    base, unused, wg, projletters, amd = result.captures
+  if (result = /^P*((802|60802)(\.(\d+))*([A-Z]+|[a-z]+)?)([a-z]*$)/.match(desig_string))
+    base, _grp, unused, wg, projletters, amd = result.captures
     ptype = amd.empty? ? 'NewStandard' : 'Amendment'
-  elsif (result = /P*(802(\.(\d+))([A-Z]+|[a-z]+))-[rR][eE][vV]/.match(desig_string))
-    base, unused, wg, projletters = result.captures
+  elsif (result = /^P*((802|60802)(\.(\d+))*([A-Z]+|[a-z]+)?)-[rR][eE][vV]$/.match(desig_string))
+    base, _grp, unused, wg, projletters = result.captures
     ptype = 'Revision'
-  elsif (result = /P*(802(\.(\d+))([A-Z]+|[a-z]+)-*\d*)\/[cC][oO][rR]-*(\d+)/.match(desig_string))
-    base, unused, wg, projletters, amd = result.captures
+  elsif (result = /^P*((802|60802)(\.(\d+))*([A-Z]+|[a-z]+)?-*\d*)\/[cC][oO][rR]-*(\d+)$/.match(desig_string))
+    base, _grp, unused, wg, projletters, amd = result.captures
     ptype = 'Corrigendum'
-  elsif (result = /P*(802(\.(\d+))([A-Z]+|[a-z]+)-*\d*)\/[eE][rR][rR]-*(\d+)/.match(desig_string))
-    base, unused, wg, projletters, amd = result.captures
+  elsif (result = /^P*((802|60802)(\.(\d+))*([A-Z]+|[a-z]+)?-*\d*)\/[eE][rR][rR]-*(\d+)$/.match(desig_string))
+    base, _grp, unused, wg, projletters, amd = result.captures
     ptype = 'Erratum'
   end
 
@@ -590,9 +590,21 @@ def parse_insanity_spreadsheet(api, cookie, filepath, opts)
 
   # Provess the "TaskGroups" sheet
   tgsheet = book['TaskGroups']
+  tgcolnames = { shortname: 0, fullname: 1, chair_first: 2, chair_last: 3 }
+  if tgsheet.nil?
+    tgsheet = book['TGs']
+    tgcolnames = { shortname: 1, fullname: 2, chair_first: 5, chair_last: 6 }
+  end
+  if tgsheet.nil?
+    $logger.fatal "Task group names not found in workbook #{filepath}"
+    exit(1)
+  end
   tgnames = {}
   tgsheet[(i = 0)..tgsheet.count - 1].each do |tgrow|
-    tgnames[tgrow[0].value] = { name: tgrow[1].value, chair_first_name: tgrow[2]&.value, chair_last_name: tgrow[3]&.value }
+    break if tgrow.nil?
+    tgnames[tgrow[tgcolnames[:shortname]].value] = { name: tgrow[tgcolnames[:fullname]].value,
+                                                     chair_first_name: tgrow[tgcolnames[:chair_first]]&.value,
+                                                     chair_last_name: tgrow[tgcolnames[:chair_last]]&.value }
   end
   tgnames.each do |abbrev, taskgroup|
     puts "TG #{abbrev}: #{taskgroup}" if $DEBUG
